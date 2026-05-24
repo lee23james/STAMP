@@ -11,7 +11,7 @@ from model.segment_anything import SamPredictor, sam_model_registry
 from dataset.refer_seg_dataset import ValDataset
 from dataset.grefer_seg_dataset import grefcocoValDataset
 from data.question_answer_list import QUESTION_PARTIAL
-from segment_predictor import GenerativeSegmenter
+from segment_predictor_cache import GenerativeSegmenter
 from eval.utils import AverageMeter, Summary, intersectionAndUnionGPU, \
     compute_logits_from_mask, masks_sample_points
 

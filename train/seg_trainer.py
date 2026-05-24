@@ -4,7 +4,7 @@ from transformers import DynamicCache
 from trl import SFTTrainer
 import torch.nn.functional as F
 import torch.nn.utils.rnn as rnn_utils
-from segment_predictor import find_image_patch_info
+from segment_predictor_cache import find_image_patch_info
 from .utils import append_after_segment_torch
 import torchvision.transforms as T
 
@@ -23,14 +23,17 @@ class WeightedDiceBCELoss(nn.Module):
         self.beta = beta
 
     def forward(self, inputs, targets, smooth=1):
-        inputs = torch.sigmoid(inputs)
+        logits = torch.nan_to_num(inputs.float(), nan=0.0, posinf=30.0, neginf=-30.0)
+        targets = torch.nan_to_num(targets.float(), nan=0.0, posinf=1.0, neginf=0.0).clamp_(0.0, 1.0)
+        probs = torch.sigmoid(logits)
 
-        inputs = inputs.view(-1)
+        logits = logits.view(-1)
+        probs = probs.view(-1)
         targets = targets.view(-1)
 
-        intersection = (inputs * targets).sum()
-        dice_loss = 1 - (2.*intersection + smooth)/(inputs.sum() + targets.sum() + smooth)
-        BCE = F.binary_cross_entropy(inputs, targets, reduction='mean')
+        intersection = (probs * targets).sum()
+        dice_loss = 1 - (2.*intersection + smooth)/(probs.sum() + targets.sum() + smooth)
+        BCE = F.binary_cross_entropy_with_logits(logits, targets, reduction='mean')
         loss = self.alpha * BCE + self.beta * dice_loss
 
         return loss
@@ -44,6 +47,81 @@ class SegmentationSFTTrainer(SFTTrainer):
         self.yes_token_id = self.processing_class.tokenizer.convert_tokens_to_ids("<|yes|>")
         self.no_token_id = self.processing_class.tokenizer.convert_tokens_to_ids("<|no|>")
         self.image_pad_id = self.processing_class.tokenizer.convert_tokens_to_ids('<|image_pad|>')
+        self.lm_loss_weight = float(os.environ.get("STAMP_LM_LOSS_WEIGHT", "1.0"))
+        self.seg_loss_weight = float(os.environ.get("STAMP_SEG_LOSS_WEIGHT", "1.0"))
+
+    def _debug_nonfinite_gradients(self, model):
+        if os.environ.get("STAMP_DEBUG_GRADS", "0") != "1":
+            return
+
+        max_items = int(os.environ.get("STAMP_DEBUG_GRADS_MAX_ITEMS", "40"))
+        groups = {}
+        bad_lines = []
+        tensors_with_grad = 0
+        bad_tensors = 0
+        bad_values = 0
+
+        for name, param in model.named_parameters():
+            grad = param.grad
+            if grad is None:
+                continue
+
+            tensors_with_grad += 1
+            with torch.no_grad():
+                finite_mask = torch.isfinite(grad)
+                nonfinite = grad.numel() - finite_mask.sum().item()
+                group_name = "other"
+                if "classifier" in name:
+                    group_name = "classifier"
+                elif "lora_" in name:
+                    group_name = "lora"
+                elif "embed_tokens" in name:
+                    group_name = "embed_tokens"
+                elif "lm_head" in name:
+                    group_name = "lm_head"
+
+                group = groups.setdefault(group_name, {"tensors": 0, "bad_tensors": 0, "bad_values": 0})
+                group["tensors"] += 1
+
+                if nonfinite:
+                    bad_tensors += 1
+                    bad_values += nonfinite
+                    group["bad_tensors"] += 1
+                    group["bad_values"] += nonfinite
+                    if len(bad_lines) < max_items:
+                        finite_grad = grad[finite_mask]
+                        finite_abs_max = finite_grad.float().abs().max().item() if finite_grad.numel() else float("nan")
+                        bad_lines.append(
+                            f"{name}: shape={tuple(grad.shape)} nonfinite={nonfinite}/{grad.numel()} "
+                            f"finite_abs_max={finite_abs_max:.6g}"
+                        )
+
+        if IS_MAIN_PROCESS:
+            print("--- Gradient finite check ---", flush=True)
+            print(
+                f"tensors_with_grad={tensors_with_grad}, bad_tensors={bad_tensors}, bad_values={bad_values}",
+                flush=True,
+            )
+            for group_name, group in sorted(groups.items()):
+                print(
+                    f"group={group_name}: tensors={group['tensors']}, "
+                    f"bad_tensors={group['bad_tensors']}, bad_values={group['bad_values']}",
+                    flush=True,
+                )
+            if bad_lines:
+                print("--- First non-finite gradient tensors ---", flush=True)
+                for line in bad_lines:
+                    print(line, flush=True)
+            else:
+                print("--- No non-finite gradients detected after backward ---", flush=True)
+
+        if os.environ.get("STAMP_DEBUG_ABORT_AFTER_GRADS", "0") == "1":
+            raise RuntimeError("STAMP_DEBUG_ABORT_AFTER_GRADS=1 requested abort after gradient check")
+
+    def training_step(self, model, inputs, num_items_in_batch=None):
+        loss = super().training_step(model, inputs, num_items_in_batch)
+        self._debug_nonfinite_gradients(model)
+        return loss
 
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         torch.cuda.empty_cache()
@@ -159,7 +237,7 @@ class SegmentationSFTTrainer(SFTTrainer):
                 plt.close()
 
             loss_seg = loss_seg / num_gt
-        total_loss = loss_lm + loss_seg
+        total_loss = self.lm_loss_weight * loss_lm + self.seg_loss_weight * loss_seg
 
         self._metrics['train']['loss_lm'].append(loss_lm.item())
         self._metrics['train']['loss_seg'].append(loss_seg.item())

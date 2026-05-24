@@ -1,0 +1,27 @@
+# Python/runtime caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local model/download caches
+.hf_cache/
+checkpoints/
+*.pth
+*.pt
+*.bin
+*.safetensors
+
+# Experiment outputs and generated artifacts
+output/
+output_eval/
+seg_vis.png
+STAMP/
+
+# Large/local paper assets
+paper/
+
+# Environment/editor noise
+.env
+.venv/
+.idea/
+.vscode/

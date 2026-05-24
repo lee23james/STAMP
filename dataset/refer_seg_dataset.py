@@ -44,7 +44,8 @@ class ValDataset(torch.utils.data.Dataset):
                 elif ds in ["refcoco", "refcoco+", "refcocog", "grefcoco"]:
                     item["file_name"] = os.path.join(
                         base_image_dir,
-                        "images/coco_2014/train2014",
+                        # "images/coco_2014/train2014",
+                        "images/mscoco/images/train2014",
                         item["file_name"],
                     )
                 refer_seg_ds["images"].append(item)

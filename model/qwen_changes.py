@@ -379,6 +379,7 @@ class SegQwenVL(Qwen2VLForConditionalGeneration):
                 position_ids=None, labels: torch.LongTensor = None, do_classification: bool=False, output_hidden_states=False, **kwargs,):
 
         if do_classification:  
+            kwargs.pop("inputs_embeds", None)
             inputs_embeds = self.model.get_input_embeddings()(input_ids)
             image_embeds = self.model.get_image_features(pixel_values, kwargs['image_grid_thw'])
             image_embeds = torch.cat(image_embeds, dim=0).to(inputs_embeds.device, inputs_embeds.dtype)
@@ -430,4 +431,3 @@ class SegQwenVL(Qwen2VLForConditionalGeneration):
                     original_output.loss += dummy_loss
 
             return original_output
-
