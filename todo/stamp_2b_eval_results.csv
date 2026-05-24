@@ -1,0 +1,8 @@
+model,dataset,refer_split,eval_split,finished_at,images,masks,raw_giou,raw_ciou,sam_giou,sam_ciou,result_file
+STAMP-2B-uni,refcoco,unc,val,2026-05-24 12:54:29,1500,10834,0.7660,0.7783,0.8266,0.8212,output_eval/refcoco_unc_val_2b/STAMP-2B-uni/refcoco_unc_val/evaluation_results.txt
+STAMP-2B-uni,refcoco,unc,testA,2026-05-24 13:39:55,750,5657,0.7781,0.7911,0.8423,0.8386,output_eval/2b_full/refcoco_unc_testA/STAMP-2B-uni/refcoco_unc_testA/evaluation_results.txt
+STAMP-2B-uni,refcoco,unc,testB,2026-05-24 14:19:10,750,5095,0.7533,0.7626,0.8049,0.7981,output_eval/2b_full/refcoco_unc_testB/STAMP-2B-uni/refcoco_unc_testB/evaluation_results.txt
+STAMP-2B-uni,refcoco+,unc,val,2026-05-24 15:37:58,1500,10758,0.7334,0.7344,0.7917,0.7735,output_eval/2b_full/refcoco+_unc_val/STAMP-2B-uni/refcoco+_unc_val/evaluation_results.txt
+STAMP-2B-uni,refcoco+,unc,testA,2026-05-24 16:22:52,750,5726,0.7597,0.7674,0.8214,0.8117,output_eval/2b_full/refcoco+_unc_testA/STAMP-2B-uni/refcoco+_unc_testA/evaluation_results.txt
+STAMP-2B-uni,refcoco+,unc,testB,2026-05-24 17:55:39,750,4889,0.7045,0.6949,0.7530,0.7258,output_eval/2b_full_single_gpu/refcoco+_unc_testB/STAMP-2B-uni/refcoco+_unc_testB/evaluation_results.txt
+STAMP-2B-uni,refcocog,umd,val,2026-05-24 19:08:51,1300,4896,0.7293,0.7535,0.7937,0.7907,output_eval/2b_full_single_gpu/refcocog_umd_val/STAMP-2B-uni/refcocog_umd_val/evaluation_results.txt
